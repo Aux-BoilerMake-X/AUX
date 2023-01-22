@@ -124,24 +124,33 @@ class MainProvider extends ChangeNotifier {
       }).toList();
 
   MainProvider() {
-    print("MainProvider");
     _songs = [];
 
-    if (_songs.length > 0) {
-      mainSong = _songs[0];
-    } else {
-      mainSong = null;
-    }
+    mainSong = null;
 
     Socket.connect(url, port).then((Socket sock) {
       socket = sock;
       socket.listen(_dataHandler,
           onError: _errorHandler, onDone: _doneHandler, cancelOnError: false);
     });
+
+    _getExistingList();
   }
 
   Future<void> updateUpArrow(Song song) async {
     String hash = song.getHash();
+
+    switch (song.status) {
+      case -1:
+        await _vote(song.uri, 2);
+        break;
+      case 0:
+        await _vote(song.uri, 1);
+        break;
+      case 1:
+        await _vote(song.uri, -1);
+        break;
+    }
 
     if (song.status == 1) {
       _upHashMap.removeWhere((String item) => item == hash);
@@ -155,6 +164,18 @@ class MainProvider extends ChangeNotifier {
   Future<void> updateDownArrow(Song song) async {
     String hash = song.getHash();
 
+    switch (song.status) {
+      case -1:
+        await _vote(song.uri, 1);
+        break;
+      case 0:
+        await _vote(song.uri, -1);
+        break;
+      case 1:
+        await _vote(song.uri, -2);
+        break;
+    }
+
     if (song.status == -1) {
       _downHashMap.removeWhere((String item) => item == hash);
     } else {
@@ -162,6 +183,27 @@ class MainProvider extends ChangeNotifier {
       _downHashMap.add(hash);
     }
     notifyListeners();
+  }
+
+  Future<void> _getExistingList() async {
+    String endpoint = "http://" + url + ":8000/auxing/getList/";
+
+    print(endpoint);
+
+    var response = await http.get(Uri.parse(endpoint));
+    var _songsJson = jsonDecode(response.body);
+    _songs = List<Song>.from(_songsJson.map((song) => Song.fromJson(song)));
+
+    notifyListeners();
+  }
+
+  Future<void> _vote(String uri, int vote) async {
+    String endpoint = "http://" + url + ":8000/auxing/vote/";
+
+    print(endpoint);
+
+    await http
+        .post(Uri.parse(endpoint), body: {"vote": vote.toString(), "uri": uri});
   }
 
   void _dataHandler(data) {
