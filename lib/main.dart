@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 const Color color1 = Color.fromARGB(255, 12, 12, 12);
-const Color color2 = Color.fromARGB(255, 20, 79, 12);
+const Color color2 = Color.fromARGB(255, 12, 79, 28);
 const Color color3 = Color.fromARGB(255, 183, 183, 183);
 const Color color4 = Color.fromARGB(255, 66, 255, 41);
 const Color color5 = Color.fromARGB(255, 255, 41, 41);
@@ -256,7 +256,7 @@ class WelcomePage extends StatelessWidget {
                   child: Text(
                     "AUX",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 128, color: color4),
+                    style: TextStyle(fontSize: 128, color: color2),
                   ),
                 ),
               ),
@@ -395,43 +395,63 @@ class _SearchPageState extends State<SearchPage> {
         children: [
           Container(
             padding: const EdgeInsets.only(top: 40),
-            height: 100,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            // height: 100,
+            child: Column(
               children: [
-                Expanded(
-                  child: Container(
-                    child: TextField(
-                      onChanged: ((value) => _searchTerm = value),
-                      style: const TextStyle(color: color3),
-                      decoration: const InputDecoration(
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: color2, width: 1.0),
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.keyboard_double_arrow_left,
+                          color: color3,
+                          size: 48,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: color3, width: 1.0),
-                          borderRadius: BorderRadius.all(Radius.circular(16)),
-                        ),
-                        border: OutlineInputBorder(),
-                        hintText: 'Enter a search term',
-                        hintStyle: TextStyle(color: textColor1),
                       ),
                     ),
-                  ),
+                    Expanded(
+                      child: Container(
+                        child: TextField(
+                          onChanged: ((value) => _searchTerm = value),
+                          style: const TextStyle(color: color3),
+                          decoration: const InputDecoration(
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: color2, width: 1.0),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(16)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: color3, width: 1.0),
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(16)),
+                            ),
+                            border: OutlineInputBorder(),
+                            hintText: 'Enter a search term',
+                            hintStyle: TextStyle(color: textColor1),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 GestureDetector(
                   onTap: () => _search(),
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.arrow_circle_right_outlined,
-                      color: color3,
-                      size: 48,
-                    ),
-                  ),
-                ),
+                      decoration: BoxDecoration(
+                          color: color3,
+                          borderRadius: BorderRadius.all(Radius.circular(15))),
+                      width: double.infinity,
+                      height: 40,
+                      margin: EdgeInsets.symmetric(vertical: 15),
+                      child: Center(
+                          child: Text("Search",
+                              style:
+                                  TextStyle(color: textColor2, fontSize: 24)))),
+                )
               ],
             ),
           ),
