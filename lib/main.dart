@@ -1,49 +1,11 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-
-const fake_data = [
-  {
-    "artist": "Adele",
-    "name": "21",
-    "album_cover":
-        "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
-    "votes": 15,
-    "is_playing": true,
-    "is_locked_in": true,
-  },
-  {
-    "artist": "Adele",
-    "name": "21 Jump Street",
-    "album_cover":
-        "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
-    "votes": 13,
-    "is_playing": false,
-    "is_locked_in": true,
-  },
-  {
-    "artist": "Adele",
-    "name": "21 Forever",
-    "album_cover":
-        "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
-    "votes": 12,
-    "is_playing": false,
-    "is_locked_in": false,
-  },
-  {
-    "artist": "Adele",
-    "name": "22",
-    "album_cover":
-        "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
-    "votes": 3,
-    "is_playing": false,
-    "is_locked_in": false,
-  },
-];
 
 const Color color1 = Color.fromARGB(255, 12, 12, 12);
 const Color color2 = Color.fromARGB(255, 20, 79, 12);
@@ -59,22 +21,43 @@ class Song {
   late String artist;
   late String name;
   late String albumCover;
+  late String uri;
   late int votes;
   late bool isPlaying;
   late bool isLockedIn;
+  late int status;
 
-  Song(this.artist, this.name, this.albumCover, this.votes, this.isPlaying,
-      this.isLockedIn);
+  Song(this.artist, this.name, this.albumCover, this.uri, this.votes,
+      this.isPlaying, this.isLockedIn, this.status);
 
   factory Song.fromJson(dynamic json) {
+    bool _isPlaying =
+        json.containsKey("is_playing") ? json["is_playing"] as bool : false;
+    bool _isLockedIn =
+        json.containsKey("is_locked_in") ? json["is_locked_in"] as bool : false;
+
     return Song(
-      json['artist'] as String,
-      json['name'] as String,
-      json['album_cover'] as String,
-      json['votes'] as int,
-      json['is_playing'] as bool,
-      json['is_locked_in'] as bool,
-    );
+        json['artist'] as String,
+        json['title'] as String,
+        json['album_cover'] as String,
+        json['uri'] as String,
+        json['votes'] as int,
+        _isPlaying,
+        _isLockedIn,
+        0);
+  }
+
+  Map<String, dynamic> toJson() => {
+        "artist": artist,
+        "title": name,
+        "album_cover": albumCover,
+        "uri": uri,
+        "votes": votes,
+        "duration": 0,
+      };
+
+  String getHash() {
+    return name + albumCover + artist;
   }
 
   Widget getWidget(double size) {
@@ -88,14 +71,17 @@ class Song {
           child: Image.network(albumCover),
         ),
         Container(
-          width: 1.0 * size,
+          // width: 1.0 * size,
           padding: EdgeInsets.only(left: .15 * size),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(name,
-                  style: TextStyle(color: textColor1, fontSize: .36 * size)),
+              SizedBox(
+                  width: 120,
+                  child: Text(name,
+                      style:
+                          TextStyle(color: textColor1, fontSize: .24 * size))),
               Text(artist,
                   style: TextStyle(color: textColor2, fontSize: .20 * size))
             ],
@@ -104,52 +90,93 @@ class Song {
       ],
     ));
   }
-
-  // String getHash
 }
 
 void main() {
   runApp(const MyApp());
 }
 
+final url = "172.20.10.4";
+final port = "8000";
+
 class MainProvider extends ChangeNotifier {
-  final url = "172.20.10.7";
-  final port = 4550;
+  final port = 5004;
 
-  late List<Song> songs;
-  late Song mainSong;
+  Song? mainSong;
 
-  // late Socket socket;
+  late List<Song> _songs;
+  List<String> _upHashMap = [];
+  List<String> _downHashMap = [];
+
+  late Socket socket;
+
+  List<Song> get songs => _songs.map((song) {
+        String hash = song.getHash();
+
+        if (_upHashMap.contains(hash)) {
+          song.status = 1;
+        } else if (_downHashMap.contains(hash)) {
+          song.status = -1;
+        } else {
+          song.status = 0;
+        }
+        return song;
+      }).toList();
 
   MainProvider() {
-    List<Song> _songs =
-        List<Song>.from(fake_data.map((song) => Song.fromJson(song)));
+    print("MainProvider");
+    _songs = [];
 
-    mainSong = _songs[0];
-    songs = _songs.sublist(1);
+    if (_songs.length > 0) {
+      mainSong = _songs[0];
+    } else {
+      mainSong = null;
+    }
 
-    // Socket.connect(url, port).then((Socket sock) {
-    //   socket = sock;
-    //   socket.listen(_dataHandler,
-    //       onError: _errorHandler, onDone: _doneHandler, cancelOnError: false);
-    // });
+    Socket.connect(url, port).then((Socket sock) {
+      socket = sock;
+      socket.listen(_dataHandler,
+          onError: _errorHandler, onDone: _doneHandler, cancelOnError: false);
+    });
   }
 
-  // void _dataHandler(data) {
-  //   print(String.fromCharCodes(data).trim());
-  // }
+  Future<void> updateUpArrow(Song song) async {
+    String hash = song.getHash();
 
-  // void _errorHandler(error, StackTrace trace) {
-  //   print(error);
-  // }
+    if (song.status == 1) {
+      _upHashMap.removeWhere((String item) => item == hash);
+    } else {
+      _downHashMap.removeWhere((String item) => item == hash);
+      _upHashMap.add(hash);
+    }
+    notifyListeners();
+  }
 
-  // void _doneHandler() {
-  //   socket.destroy();
-  // }
+  Future<void> updateDownArrow(Song song) async {
+    String hash = song.getHash();
 
-  // void sendData() {
-  //   socket.write("hello there");
-  // }
+    if (song.status == -1) {
+      _downHashMap.removeWhere((String item) => item == hash);
+    } else {
+      _upHashMap.removeWhere((String item) => item == hash);
+      _downHashMap.add(hash);
+    }
+    notifyListeners();
+  }
+
+  void _dataHandler(data) {
+    var _songsJson = jsonDecode(String.fromCharCodes(data));
+    _songs = List<Song>.from(_songsJson.map((song) => Song.fromJson(song)));
+    notifyListeners();
+  }
+
+  void _errorHandler(error, StackTrace trace) {
+    print(error);
+  }
+
+  void _doneHandler() {
+    socket.destroy();
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -173,6 +200,7 @@ class WelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("WelcomePage");
     return Scaffold(
         backgroundColor: color1,
         body: Container(
@@ -232,11 +260,12 @@ class WelcomePage extends StatelessWidget {
   Future<void> _authenticate() async {
     String CLIENT_ID = 'c287f4b6bc874c2ab63169028d5aedc1';
     String CLIENT_SECRET = '81f3641081dc4e50bc950346f1c2562a';
-    String SPOTIPY_REDIRECT_URI = "http://172.20.10.7:5001/";
+    String SPOTIPY_REDIRECT_URI =
+        "http://172.20.10.4:8000/auxing/authenticate/";
     String SCOPE =
         "user-modify-playback-state playlist-modify-public user-read-currently-playing";
     String CACHE = '.spotipyoauthcache';
-    int PORT = 8080;
+    int PORT = 8000;
 
     String urlString =
         "https://accounts.spotify.com/authorize?response_type=code&client_id=${CLIENT_ID}&scope=${SCOPE}&redirect_uri=${SPOTIPY_REDIRECT_URI}&state=5";
@@ -258,6 +287,7 @@ class MainPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("MainPage");
     return MaterialApp(
         home: ChangeNotifierProvider(
             create: (context) => MainProvider(),
@@ -311,6 +341,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    print("SearchPage");
     return MaterialApp(
         home: Scaffold(
             body: Container(
@@ -369,9 +400,12 @@ class _SearchPageState extends State<SearchPage> {
                   padding: EdgeInsets.only(top: 0),
                   itemCount: _songs.length,
                   itemBuilder: (BuildContext context, int index) {
-                    return SongWidget(
-                      song: _songs[index],
-                      isSearch: true,
+                    return GestureDetector(
+                      child: SongWidget(
+                        song: _songs[index],
+                        isSearch: true,
+                      ),
+                      onTap: () => _addToQueue(_songs[index]),
                     );
                   }),
             ),
@@ -382,13 +416,26 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _search() async {
-    _songs = List<Song>.from(fake_data.map((song) => Song.fromJson(song)));
+    // _songs = List<Song>.from(fakeData.map((song) => Song.fromJson(song)));
+    String endpoint = "http://" + url + ":" + port + "/auxing/search/";
+    var response =
+        await http.post(Uri.parse(endpoint), body: {"thing": _searchTerm});
+    var songJsons = json.decode(response.body);
+    _songs = List<Song>.from(songJsons.map((song) => Song.fromJson(song)));
     setState(() {});
+  }
+
+  Future<void> _addToQueue(Song song) async {
+    String endpoint = "http://" + url + ":" + port + "/auxing/addToList/";
+
+    await http
+        .post(Uri.parse(endpoint), body: {"json": json.encode(song.toJson())});
+    Navigator.pop(context);
   }
 }
 
 class MainSongWidget extends StatelessWidget {
-  late Song song;
+  late Song? song;
 
   MainSongWidget({required this.song});
 
@@ -400,7 +447,7 @@ class MainSongWidget extends StatelessWidget {
         width: double.infinity,
         decoration: BoxDecoration(
             color: color2, borderRadius: BorderRadius.all(Radius.circular(20))),
-        child: song.getWidget(120));
+        child: song != null ? song!.getWidget(120) : Container());
   }
 }
 
@@ -445,11 +492,8 @@ class SongWidget extends StatefulWidget {
 }
 
 class _SongWidgetState extends State<SongWidget> {
-  late int select;
-
   @override
   void initState() {
-    select = 0;
     super.initState();
   }
 
@@ -475,12 +519,23 @@ class _SongWidgetState extends State<SongWidget> {
                 width: 100,
                 child: Center(
                     child: widget.isSearch
-                        ? Container()
+                        ? _addSongToQueue()
                         : widget.song.isLockedIn
                             ? _lockedInWidget()
                             : _voteWidget(widget.song)))
           ])),
     );
+  }
+
+  Widget _addSongToQueue() {
+    return Container(
+        width: 80,
+        height: 35,
+        decoration: BoxDecoration(
+            color: color3, borderRadius: BorderRadius.all(Radius.circular(20))),
+        child: Center(
+            child: Text("Add",
+                style: TextStyle(fontSize: 18, color: textColor2))));
   }
 
   Widget _lockedInWidget() {
@@ -491,23 +546,17 @@ class _SongWidgetState extends State<SongWidget> {
   }
 
   Widget _voteWidget(Song song) {
+    MainProvider provider = Provider.of<MainProvider>(context, listen: false);
+
     return Container(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
-            onTap: () {
-              setState(() {
-                if (select == 1) {
-                  select = 0;
-                } else {
-                  select = 1;
-                }
-              });
-            },
+            onTap: () => provider.updateUpArrow(song),
             child: Icon(
               Icons.arrow_upward_outlined,
-              color: (select == 1) ? color4 : color3,
+              color: (widget.song.status == 1) ? color4 : color3,
               size: 36,
             ),
           ),
@@ -516,25 +565,17 @@ class _SongWidgetState extends State<SongWidget> {
             child: Center(
               child: Text(song.votes.toString(),
                   style: TextStyle(
-                      color: (select == 1)
+                      color: (widget.song.status == 1)
                           ? color4
-                          : ((select == -1) ? color5 : color3),
+                          : ((widget.song.status == -1) ? color5 : color3),
                       fontSize: 24)),
             ),
           ),
           GestureDetector(
-            onTap: () {
-              setState(() {
-                if (select == -1) {
-                  select = 0;
-                } else {
-                  select = -1;
-                }
-              });
-            },
+            onTap: () => provider.updateDownArrow(song),
             child: Icon(
               Icons.arrow_downward_outlined,
-              color: (select == -1) ? color5 : color3,
+              color: (widget.song.status == -1) ? color5 : color3,
               size: 36,
             ),
           ),
