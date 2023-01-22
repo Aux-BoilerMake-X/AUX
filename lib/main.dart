@@ -81,9 +81,9 @@ class Song {
                   width: 120,
                   child: Text(name,
                       style:
-                          TextStyle(color: textColor1, fontSize: .24 * size))),
+                          TextStyle(color: textColor1, fontSize: .2 * size))),
               Text(artist,
-                  style: TextStyle(color: textColor2, fontSize: .20 * size))
+                  style: TextStyle(color: textColor2, fontSize: .15 * size))
             ],
           ),
         )
@@ -188,19 +188,20 @@ class MainProvider extends ChangeNotifier {
   Future<void> _getExistingList() async {
     String endpoint = "http://" + url + ":8000/auxing/getList/";
 
-    print(endpoint);
-
     var response = await http.get(Uri.parse(endpoint));
     var _songsJson = jsonDecode(response.body);
     _songs = List<Song>.from(_songsJson.map((song) => Song.fromJson(song)));
+
+    if (_songs.length > 0) {
+      mainSong = _songs[_songs.length - 1];
+      _songs.removeAt(_songs.length - 1);
+    }
 
     notifyListeners();
   }
 
   Future<void> _vote(String uri, int vote) async {
     String endpoint = "http://" + url + ":8000/auxing/vote/";
-
-    print(endpoint);
 
     await http
         .post(Uri.parse(endpoint), body: {"vote": vote.toString(), "uri": uri});
@@ -209,6 +210,11 @@ class MainProvider extends ChangeNotifier {
   void _dataHandler(data) {
     var _songsJson = jsonDecode(String.fromCharCodes(data));
     _songs = List<Song>.from(_songsJson.map((song) => Song.fromJson(song)));
+
+    if (_songs.length > 0) {
+      mainSong = _songs[_songs.length - 1];
+      _songs.removeAt(_songs.length - 1);
+    }
     notifyListeners();
   }
 
