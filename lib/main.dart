@@ -18,7 +18,7 @@ const fake_data = [
   },
   {
     "artist": "Adele",
-    "name": "21",
+    "name": "21 Jump Street",
     "album_cover":
         "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
     "votes": 13,
@@ -27,7 +27,7 @@ const fake_data = [
   },
   {
     "artist": "Adele",
-    "name": "21",
+    "name": "21 Forever",
     "album_cover":
         "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
     "votes": 12,
@@ -36,7 +36,7 @@ const fake_data = [
   },
   {
     "artist": "Adele",
-    "name": "21",
+    "name": "22",
     "album_cover":
         "https://i.scdn.co/image/ab67616d0000b2732118bf9b198b05a95ded6300",
     "votes": 3,
@@ -104,6 +104,8 @@ class Song {
       ],
     ));
   }
+
+  // String getHash
 }
 
 void main() {
